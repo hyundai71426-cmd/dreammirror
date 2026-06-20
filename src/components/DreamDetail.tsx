@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, Trash2, Heart, ShieldAlert, Sparkles, Star, UserPlus, MapPin, KeyRound, Clock, Edit3, Check } from "lucide-react";
 import { Dream } from "../types";
+import { analyzePerspectives, chatCharacter } from "../api";
 
 interface DreamDetailProps {
   dream: Dream;
@@ -29,19 +30,7 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate }: Dream
     if (perspectives) return;
     setLoadingPerspectives(true);
     try {
-      const customApiKey = localStorage.getItem("gemini_api_key") || "";
-      const customModel = localStorage.getItem("gemini_preferred_model") || "gemini-3.1-flash-lite";
-
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
-      if (customModel) headers["x-gemini-model"] = customModel;
-
-      const response = await fetch("/api/analyze-perspectives", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ title: dream.title, content: dream.content })
-      });
-      const data = await response.json();
+      const data = await analyzePerspectives(dream.title, dream.content);
       setPerspectives(data);
     } catch (e) {
       console.error("Perspective analysis failed:", e);
@@ -74,25 +63,12 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate }: Dream
     setSendingChat(true);
 
     try {
-      const customApiKey = localStorage.getItem("gemini_api_key") || "";
-      const customModel = localStorage.getItem("gemini_preferred_model") || "gemini-3.1-flash-lite";
-
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
-      if (customModel) headers["x-gemini-model"] = customModel;
-
-      const response = await fetch("/api/chat-character", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          character: activeChatChar,
-          dreamContent: dream.content,
-          userInput: userMsg,
-          chatHistory: chatHistory.map(h => ({ sender: h.role === "user" ? "user" : "character", text: h.text }))
-        })
-      });
-
-      const data = await response.json();
+      const data = await chatCharacter(
+        activeChatChar,
+        dream.content,
+        userMsg,
+        chatHistory.map(h => ({ sender: h.role === "user" ? "user" : "character", text: h.text }))
+      );
       setChatHistory(prev => [...prev, { role: "char", text: data.response || "내면에 울림이 지나갑니다. 가슴을 들여다 보세요." }]);
     } catch (e) {
       console.error("Character chat failed:", e);

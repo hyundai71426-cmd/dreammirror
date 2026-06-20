@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Sparkles, BookOpen, AlertCircle, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { lookUpSymbol } from "../api";
 
 interface SymbolData {
   core: string;
@@ -27,19 +28,7 @@ export default function SymbolDictionary() {
     setResult(null);
 
     try {
-      const customApiKey = localStorage.getItem("gemini_api_key") || "";
-      const customModel = localStorage.getItem("gemini_preferred_model") || "gemini-3.1-flash-lite";
-
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
-      if (customModel) headers["x-gemini-model"] = customModel;
-
-      const response = await fetch("/api/look-up-symbol", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ keyword: targetWord })
-      });
-      const data = await response.json();
+      const data = await lookUpSymbol(targetWord);
       setResult(data);
     } catch (e) {
       console.error("Symbol lookup failed:", e);

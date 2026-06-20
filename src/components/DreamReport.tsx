@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Sparkles, BarChart3, AlertTriangle, ShieldAlert, Zap, Clock, Users, MapPin, Eye, Play, CheckCircle2 } from "lucide-react";
 import { Dream } from "../types";
+import { generateReport } from "../api";
 
 interface DreamReportProps {
   dreams: Dream[];
@@ -139,19 +140,7 @@ export default function DreamReport({ dreams, onTriggerAd, isUnlocked }: DreamRe
 
       let aiOverviewText = "";
       if (unlockedWithDefault && dreams.length >= 4) {
-        const customApiKey = localStorage.getItem("gemini_api_key") || "";
-        const customModel = localStorage.getItem("gemini_preferred_model") || "gemini-3.1-flash-lite";
-
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
-        if (customModel) headers["x-gemini-model"] = customModel;
-
-        const res = await fetch("/api/generate-report", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ dreams })
-        });
-        const data = await res.json();
+        const data = await generateReport(dreams);
         aiOverviewText = data.aiOverview;
       } else {
         aiOverviewText = "불안과 성취, 혹은 일상의 다채로운 긴장 요소들이 수면 도중 활성화되는 양상을 보입니다. 주변의 지지체계 및 건강한 루틴 구축에 힘을 기울이는 것이 큰 힘이 될 수 있습니다. (이 분석은 의료적 판단이 아닙니다.)";

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, Square, Sparkles, Check, Flame, Star, BookOpen, AlertCircle, ArrowLeft, ArrowRight, Save, Clock } from "lucide-react";
 import { Dream, DreamAnalysis } from "../types";
 import { motion, AnimatePresence } from "motion/react";
+import { analyzeDream } from "../api";
 
 interface DreamRecorderProps {
   onSave: (dream: Dream) => void;
@@ -185,24 +186,7 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
     const tickTimeouts = [1000, 2000, 2800, 3500];
     
     try {
-      const customApiKey = localStorage.getItem("gemini_api_key") || "";
-      const customModel = localStorage.getItem("gemini_preferred_model") || "gemini-3.1-flash-lite";
-
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (customApiKey) headers["x-gemini-api-key"] = customApiKey;
-      if (customModel) headers["x-gemini-model"] = customModel;
-
-      // Call backend API for real Gemini synthesis
-      const response = await fetch("/api/analyze-dream", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          content: transcript,
-          emotions: selectedEmotions
-        })
-      });
-
-      const result = await response.json();
+      const result = await analyzeDream(transcript, selectedEmotions);
       
       setTimeout(() => {
         const dateStr = new Date().toISOString().split("T")[0];
