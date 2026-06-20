@@ -1,0 +1,6 @@
+{
+  "name": "DreamMirror",
+  "description": "AI-powered dream analysis & unconscious emotion journaling platform (무의식의 메아리). Explore your dreams, trace emotional patterns, compare Sigmund Freud vs Carl Jung perspectives, and look up Jungian dream symbols.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
