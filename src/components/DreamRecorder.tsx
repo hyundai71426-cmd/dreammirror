@@ -27,6 +27,7 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
   // Steps:
   // "ready" -> "recording" -> "text_editing" -> "emotion_select" -> "additional_info" -> "ai_analyzing"
   const [step, setStep] = useState<"ready" | "recording" | "text_editing" | "emotion_select" | "additional_info" | "ai_analyzing" | "completed">("ready");
+  const [apiError, setApiError] = useState<string | null>(null);
   
   const [seconds, setSeconds] = useState(0);
   const [audioInputSimulated, setAudioInputSimulated] = useState(false);
@@ -180,63 +181,37 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
 
   // Call API or Fallback to create analysis
   const handleSaveAndAnalyze = async () => {
+    setApiError(null);
     setStep("ai_analyzing");
-    
-    // Simulate tick marks sequence step-by-step for cool futuristic UI
-    const tickTimeouts = [1000, 2000, 2800, 3500];
     
     try {
       const result = await analyzeDream(transcript, selectedEmotions);
       
-      setTimeout(() => {
-        const dateStr = new Date().toISOString().split("T")[0];
-        const newDream: Dream = {
-          id: `dream-${Date.now()}`,
-          title: result.title || dreamTitle || "지정되지 않은 제목",
-          content: transcript,
-          sleepScore: sleepScore,
-          vividness: vividness,
-          nightmareScore: nightmareScore,
-          createdAt: dateStr,
-          emotions: selectedEmotions.length > 0 ? selectedEmotions : (result.analysis?.emotion || ["불안"]),
-          analysis: result.analysis || {
-            people: ["나"],
-            location: ["알 수 없음"],
-            theme: ["심리적 반사"],
-            emotion: selectedEmotions,
-            summary: "꿈에 감정이 녹아들어 있습니다. 천천히 무의식을 탐미하세요."
-          }
-        };
+      const dateStr = new Date().toISOString().split("T")[0];
+      const newDream: Dream = {
+        id: `dream-${Date.now()}`,
+        title: result.title || dreamTitle || "지정되지 않은 제목",
+        content: transcript,
+        sleepScore: sleepScore,
+        vividness: vividness,
+        nightmareScore: nightmareScore,
+        createdAt: dateStr,
+        emotions: selectedEmotions.length > 0 ? selectedEmotions : (result.analysis?.emotion || ["불안"]),
+        analysis: result.analysis || {
+          people: ["나"],
+          location: ["알 수 없음"],
+          theme: ["심리적 반사"],
+          emotion: selectedEmotions,
+          summary: "꿈에 감정이 녹아들어 있습니다. 천천히 무의식을 탐미하세요."
+        }
+      };
 
-        onSave(newDream);
-        setStep("completed");
-      }, 4000);
+      onSave(newDream);
+      setStep("completed");
 
-    } catch (e) {
-      console.error("AI Dream analysis failed, fallback active:", e);
-      // Fallback
-      setTimeout(() => {
-        const dateStr = new Date().toISOString().split("T")[0];
-        const newDream: Dream = {
-          id: `dream-${Date.now()}`,
-          title: dreamTitle || "기록된 꿈",
-          content: transcript,
-          sleepScore: sleepScore,
-          vividness: vividness,
-          nightmareScore: nightmareScore,
-          createdAt: dateStr,
-          emotions: selectedEmotions,
-          analysis: {
-            people: ["나"],
-            location: ["일상"],
-            theme: ["심리적 잔상"],
-            emotion: selectedEmotions,
-            summary: "일상의 긴장을 해소하고 정서적 균형을 찾으려 하는 내적 투영일 수 있습니다. (참고용 정보입니다.)"
-          }
-        };
-        onSave(newDream);
-        setStep("completed");
-      }, 4000);
+    } catch (e: any) {
+      console.error("AI Dream analysis failed:", e);
+      setApiError(e.message || "AI 분석 과정에서 알 수 없는 오류가 발생했습니다. API 키 구성을 확인하십시오.");
     }
   };
 
@@ -607,40 +582,73 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
       {/* Step 6: Beautiful AI analyzing simulation view with ticks */}
       {step === "ai_analyzing" && (
         <div id="ai-processing-screen" className="px-6 py-12 flex flex-col items-center justify-center text-center">
-          <div className="relative mb-12">
-            <div className="w-24 h-24 rounded-full border-4 border-indigo-900 border-t-indigo-400 animate-spin flex items-center justify-center" />
-            <Sparkles className="w-8 h-8 text-indigo-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-bounce" />
-          </div>
-
-          <h3 className="text-xl font-bold mb-2 text-indigo-100">저장 중입니다 🌙</h3>
-          <p className="text-sm text-indigo-200/50 mb-10">AI가 당신의 무의식을 심층적으로 조망하고 있습니다.</p>
-
-          {/* Sequential items */}
-          <div className="w-full max-w-xs text-left bg-indigo-950/40 border border-indigo-900/30 p-5 rounded-2xl space-y-4">
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-500/50 flex items-center justify-center">
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
+          {apiError ? (
+            <div className="w-full max-w-sm bg-red-950/20 border border-red-900/40 rounded-3xl p-6 text-left">
+              <div className="w-12 h-12 rounded-full bg-red-950 border border-red-500/30 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-red-400" />
               </div>
-              <span className="text-indigo-100/90 font-medium">인물 추출 중...</span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-500/50 flex items-center justify-center animate-pulse">
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <h3 className="text-lg font-bold text-red-200 mb-2">AI 정밀 분석 오류</h3>
+              <p className="text-xs text-red-300 leading-relaxed mb-6 whitespace-pre-wrap">{apiError}</p>
+              
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => {
+                    setApiError(null);
+                    handleSaveAndAnalyze();
+                  }}
+                  className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer transition-all active:scale-[0.98]"
+                >
+                  다시 분석 요청하기 🔄
+                </button>
+                <button
+                  onClick={() => {
+                    setApiError(null);
+                    setStep("additional_info");
+                  }}
+                  className="w-full py-3 rounded-2xl bg-indigo-950 border border-indigo-900 hover:border-indigo-800 text-indigo-300 font-bold text-xs cursor-pointer transition-all active:scale-[0.98]"
+                >
+                  기록 수정하러 뒤로가기 ⬅️
+                </button>
               </div>
-              <span className="text-indigo-100/90 font-medium">장소 상징물 분석 중...</span>
             </div>
+          ) : (
+            <>
+              <div className="relative mb-12">
+                <div className="w-24 h-24 rounded-full border-4 border-indigo-900 border-t-indigo-400 animate-spin flex items-center justify-center" />
+                <Sparkles className="w-8 h-8 text-indigo-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-bounce" />
+              </div>
 
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-800/40 animate-pulse" />
-              <span className="text-indigo-300/50">정서 및 핵심 감정 맵핑 중...</span>
-            </div>
+              <h3 className="text-xl font-bold mb-2 text-indigo-100">저장 중입니다 🌙</h3>
+              <p className="text-sm text-indigo-200/50 mb-10">AI가 당신의 무의식을 심층적으로 조망하고 있습니다.</p>
 
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-800/40" />
-              <span className="text-indigo-300/40">장기 반복 수면 패턴 탐색 중...</span>
-            </div>
-          </div>
+              {/* Sequential items */}
+              <div className="w-full max-w-xs text-left bg-indigo-950/40 border border-indigo-900/30 p-5 rounded-2xl space-y-4">
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-500/50 flex items-center justify-center">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-indigo-100/90 font-medium">인물 추출 중...</span>
+                </div>
+
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-500/50 flex items-center justify-center animate-pulse">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-indigo-100/90 font-medium">장소 상징물 분석 중...</span>
+                </div>
+
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-800/40 animate-pulse" />
+                  <span className="text-indigo-300/50">정서 및 핵심 감정 맵핑 중...</span>
+                </div>
+
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-800/40" />
+                  <span className="text-indigo-300/40">장기 반복 수면 패턴 탐색 중...</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

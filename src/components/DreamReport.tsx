@@ -156,8 +156,9 @@ export default function DreamReport({ dreams, onTriggerAd, isUnlocked }: DreamRe
       setAnalyzedDreamIds(dreamIds);
       localStorage.setItem("dream_mirror_cached_analyzed_dream_ids", JSON.stringify(dreamIds));
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to generate report:", err);
+      setGptOverview(`⚠️ 리포트 생성 실패: API 키 등록 여부를 설정(마이 프로필)에서 점검해 주세요. (오류 메시지: ${err.message || err})`);
     } finally {
       setLoadingGpt(false);
     }

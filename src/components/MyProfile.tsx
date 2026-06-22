@@ -242,14 +242,14 @@ export default function MyProfile({ totalDreams, unlocked, onResetMocks, onBackT
               </button>
               <button
                 type="button"
-                onClick={() => setPreferredModel("gemma-4-31b-it")}
+                onClick={() => setPreferredModel("gemini-3.5-flash")}
                 className={`py-2 px-1 text-[10px] font-black rounded-lg transition-all cursor-pointer text-center ${
-                  preferredModel === "gemma-4-31b-it"
+                  preferredModel === "gemini-3.5-flash"
                     ? "bg-indigo-600 text-white shadow font-sans"
                     : "text-indigo-400/70 hover:text-indigo-200 font-sans"
                 }`}
               >
-                gemma-4-31b-it
+                gemini-3.5-flash
               </button>
             </div>
           </div>

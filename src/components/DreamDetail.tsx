@@ -18,6 +18,7 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate }: Dream
   // Freud vs Jung Perspectives
   const [loadingPerspectives, setLoadingPerspectives] = useState(false);
   const [perspectives, setPerspectives] = useState<{ freud: string; jung: string } | null>(null);
+  const [perspectivesError, setPerspectivesError] = useState<string | null>(null);
   const [activePerspTab, setActivePerspTab] = useState<"freud" | "jung">("freud");
 
   // Character Chatbot
@@ -29,15 +30,13 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate }: Dream
   const fetchPerspectives = async () => {
     if (perspectives) return;
     setLoadingPerspectives(true);
+    setPerspectivesError(null);
     try {
       const data = await analyzePerspectives(dream.title, dream.content);
       setPerspectives(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Perspective analysis failed:", e);
-      setPerspectives({
-        freud: "지그문트 프로이트학파적 시점: 꿈 내용의 이면에는 억압된 충동과 원초적 리비도가 자아의 검열을 피해 우회적으로 표출되어 있습니다.",
-        jung: "칼 융학파적 시점: 본 꿈의 이미지들은 자아의 일지적 과중을 보정하고, 무의식적 그림자(Shadow)를 통합해 온전한 자기존엄(Self)으로 가려는 정신적 보상 작용입니다."
-      });
+      setPerspectivesError(e.message || "심리학파별 정밀 분석을 호출하는 중에 문제가 발생하였습니다.");
     } finally {
       setLoadingPerspectives(false);
     }
@@ -287,6 +286,24 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate }: Dream
             <p className="text-[10px] text-indigo-200/50 leading-relaxed mb-4">
               동일한 무의식 조각을 두고 정신분석학과 분석심리학이 제시하는 두 거장의 서로 다른 처방적 시선을 오가며 성찰해 보세요.
             </p>
+
+            {perspectivesError && (
+              <div className="mb-4 p-4.5 bg-red-950/35 border border-red-900/50 rounded-2xl text-[11px] text-red-300 leading-relaxed font-sans flex flex-col gap-2.5">
+                <div className="font-bold flex items-center gap-1 text-red-200 text-xs">
+                  <span>⚠️ AI 분석 제한 알림</span>
+                </div>
+                <p>{perspectivesError}</p>
+                <button
+                  onClick={() => {
+                    setPerspectivesError(null);
+                    fetchPerspectives();
+                  }}
+                  className="self-start px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-[10px] font-bold text-red-100 rounded-xl cursor-pointer transition-colors"
+                >
+                  분석 재시도 🔄
+                </button>
+              </div>
+            )}
 
             {!perspectives ? (
               <button
