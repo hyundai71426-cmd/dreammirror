@@ -134,7 +134,24 @@ async function callGeminiDirectly(
   return text;
 }
 
-// Helper to make a client-safe fetch. Try backend endpoint first, then direct browser-to-Gemini REST API fallback, and finally local mock fallback.
+// Helper to clean response strings that might be wrapped in markdown code blocks
+function cleanJsonString(str: string): string {
+  let cleaned = str.trim();
+  // Strip ```json ... ``` or ``` ... ```
+  if (cleaned.startsWith("```")) {
+    const lines = cleaned.split("\n");
+    if (lines[0].startsWith("```")) {
+      lines.shift();
+    }
+    if (lines[lines.length - 1].startsWith("```")) {
+      lines.pop();
+    }
+    cleaned = lines.join("\n").trim();
+  }
+  return cleaned;
+}
+
+// Helper to make a client-safe fetch. If user configures their own API key, it ALWAYS calls Gemini API directly from the browser context to bypass Vercel serverless timeouts (10 seconds) and server configuration dependencies entirely.
 async function safeApiRequest(
   endpoint: string,
   postData: Record<string, any>,
@@ -142,6 +159,16 @@ async function safeApiRequest(
   directGeminiCall: () => Promise<any>,
   localFallbackCall: () => any
 ) {
+  const customApiKey = localStorage.getItem("gemini_api_key") || "";
+  if (customApiKey) {
+    console.info(`[API Info] Custom client-side API Key detected. Performing direct browser-to-Gemini REST API call to avoid Serverless function timeouts...`);
+    try {
+      return await directGeminiCall();
+    } catch (gemError) {
+      console.error("[API Error] Direct browser-to-Gemini REST call failed. Attempting backup call via backend server...", gemError);
+    }
+  }
+
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -163,20 +190,8 @@ async function safeApiRequest(
     }
     throw new Error("Server response contains error or is invalid format");
   } catch (err) {
-    console.warn(`[API Connection Warning] Backend server endpoint '${endpoint}' is unavailable (possible Vercel/static deployment). Trying direct browser-to-Gemini REST API...`, err);
-    
-    const customApiKey = localStorage.getItem("gemini_api_key") || "";
-    if (customApiKey) {
-      try {
-        return await directGeminiCall();
-      } catch (gemError) {
-        console.error("[API Error] Direct browser-to-Gemini REST call failed. Triggering local safe fallback.", gemError);
-        return localFallbackCall();
-      }
-    } else {
-      console.info("[API Info] No custom API key set in settings. Triggering local safe fallback.");
-      return localFallbackCall();
-    }
+    console.warn(`[API Connection Warning] Backend server endpoint '${endpoint}' is unavailable or failed (possible Vercel serverless limitation). Triggering local client-side safe fallback...`, err);
+    return localFallbackCall();
   }
 }
 
@@ -225,7 +240,7 @@ export async function analyzeDream(content: string, emotions: string[]): Promise
     headers,
     async () => {
       const responseText = await callGeminiDirectly(prompt, systemInstruction, "application/json");
-      return JSON.parse(responseText.trim());
+      return JSON.parse(cleanJsonString(responseText));
     },
     () => performLocalExtraction(content, emotions)
   );
@@ -298,7 +313,7 @@ export async function analyzePerspectives(title: string, content: string): Promi
     headers,
     async () => {
       const responseText = await callGeminiDirectly(prompt, systemInstruction, "application/json");
-      return JSON.parse(responseText.trim());
+      return JSON.parse(cleanJsonString(responseText));
     },
     () => ({
       freud: "지그문트 프로이트학파적 관점에서 이 꿈의 내러티브는 일상의 검열된 욕망이나 충동의 변칙적 발현으로 해석됩니다. 억제된 상징 속 감정을 직시해 보십시오.",
@@ -335,7 +350,7 @@ export async function lookUpSymbol(keyword: string): Promise<any> {
     headers,
     async () => {
       const responseText = await callGeminiDirectly(prompt, systemInstruction, "application/json");
-      return JSON.parse(responseText.trim());
+      return JSON.parse(cleanJsonString(responseText));
     },
     () => {
       const dict: Record<string, any> = {
