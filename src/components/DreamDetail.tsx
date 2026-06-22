@@ -74,7 +74,7 @@ export default function DreamDetail({ dream, onBack, onDelete, onUpdate, theme }
       setChatHistory(prev => [...prev, { role: "char", text: data.response || "내면에 울림이 지나갑니다. 가슴을 들여다 보세요." }]);
     } catch (e) {
       console.error("Character chat failed:", e);
-      setChatHistory(prev => [...prev, { role: "char", text: `${activeChatChar}의 환영이 흐려지고 있습니다. 나중에 다시 마음속 메아리를 두드려 주세요.` }]);
+      setChatHistory(prev => [...prev, { role: "char", text: `${activeChatChar}의 의식이 흐려지고 있습니다. 1분 뒤에 다시 대화를 시도해 주세요.` }]);
     } finally {
       setSendingChat(false);
     }

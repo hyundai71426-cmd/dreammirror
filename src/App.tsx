@@ -241,8 +241,8 @@ export default function App() {
                     {theme.id === "zen" && (
                       <div className="space-y-3">
                         <div className="flex justify-between items-center px-1">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-stone-900 font-serif">무의식 서재의 서적들 (Journal Slipcases)</h4>
-                          <span className="text-[11px] font-bold text-stone-400">옆으로 쓸어 정독하기 &rarr;</span>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-stone-950 font-serif">무의식 서재의 서적들 (Journal Slipcases)</h4>
+                          <span className="text-[11px] font-black text-stone-700">옆으로 쓸어 정독하기 &rarr;</span>
                         </div>
                         
                         {/* Beautiful horizontal book collection slider */}
@@ -252,7 +252,7 @@ export default function App() {
                               <div
                                 key={dr.id}
                                 onClick={() => setSelectedDreamForDetails(dr)}
-                                className="snap-start shrink-0 w-[130px] h-[200px] rounded-r-xl bg-[#F6F2E9] border border-stone-250 shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between p-3.5 relative group overflow-hidden"
+                                className="snap-start shrink-0 w-[130px] h-[200px] rounded-r-xl bg-[#F6F2E9] border border-stone-300 shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between p-3.5 relative group overflow-hidden"
                                 style={{
                                   boxShadow: "2px 4px 10px rgba(45,42,38,0.12), inset 8px 0 12px rgba(45,42,38,0.06)"
                                 }}
@@ -262,17 +262,17 @@ export default function App() {
                                 <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-[#E6DEC9] border-r border-[#D5CBAA]" />
                                 
                                 <div className="pl-2.5">
-                                  <div className="text-[9px] font-bold text-stone-400 font-serif leading-none mt-1">
+                                  <div className="text-[10px] font-black text-stone-650 font-serif leading-none mt-1">
                                     {dr.createdAt.split("-")[1]}.{dr.createdAt.split("-")[2]}
                                   </div>
-                                  <div className="text-xs font-bold text-stone-900 font-serif leading-snug line-clamp-3 mt-2 pr-1 group-hover:text-amber-850 transition-colors">
+                                  <div className="text-xs font-black text-stone-950 font-serif leading-snug line-clamp-3 mt-2 pr-1 group-hover:text-stone-900 transition-colors">
                                     {dr.title}
                                   </div>
                                 </div>
 
                                 <div className="pl-2.5 flex flex-col justify-end">
-                                  <div className="w-5 h-0.5 bg-stone-300 my-2" />
-                                  <span className="text-[10px] font-serif text-stone-500 font-semibold truncate">
+                                  <div className="w-5 h-0.5 bg-stone-350 my-2" />
+                                  <span className="text-[10px] font-serif text-stone-800 font-bold truncate">
                                     {dr.emotions[0] || "공허"}의 서
                                   </span>
                                 </div>
@@ -283,19 +283,19 @@ export default function App() {
                             [1, 2, 3].map((val) => (
                               <div
                                 key={val}
-                                className="snap-start shrink-0 w-[130px] h-[200px] rounded-r-xl bg-[#FAF7F0] border border-stone-200/80 shadow-xs flex flex-col justify-between p-3.5 relative"
+                                className="snap-start shrink-0 w-[130px] h-[200px] rounded-r-xl bg-[#FAF7F0] border border-stone-300 shadow-xs flex flex-col justify-between p-3.5 relative"
                                 style={{
                                   boxShadow: "2px 4px 8px rgba(45,42,38,0.05), inset 8px 0 8px rgba(45,42,38,0.03)"
                                 }}
                               >
-                                <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-stone-200" />
+                                <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-stone-300" />
                                 <div className="pl-2.5">
-                                  <div className="text-[10px] font-sans text-stone-300">Vol. 0{val}</div>
-                                  <div className="text-xs font-bold text-stone-350 font-serif leading-snug mt-2">
+                                  <div className="text-[10px] font-sans text-stone-605 font-bold">Vol. 0{val}</div>
+                                  <div className="text-xs font-black text-stone-800 font-serif leading-snug mt-2">
                                     {val === 1 ? "아직 쓰이지 않은 심상" : val === 2 ? "새겨질 기록의 여백" : "조용히 기다리는 잠"}
                                   </div>
                                 </div>
-                                <div className="pl-2.5 text-[9px] font-serif text-stone-300 font-bold">
+                                <div className="pl-2.5 text-[9px] font-serif text-stone-600 font-black">
                                   DreamMirror
                                 </div>
                               </div>

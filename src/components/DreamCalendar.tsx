@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, Eye, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, Eye } from "lucide-react";
 import { Dream } from "../types";
-
-import { THEME_STYLES, ThemeStyle } from "../theme";
+import { ThemeStyle } from "../theme";
 
 interface DreamCalendarProps {
   dreams: Dream[];
@@ -94,38 +93,63 @@ export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWith
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>("2026-06-19");
 
   const selectedDayDreams = selectedCalendarDate ? (dreamsByDate[selectedCalendarDate] || []) : [];
+  const isZen = theme?.id === "zen";
 
   return (
-    <div id="dream-calendar-root" className="px-4 pb-24 text-white">
+    <div id="dream-calendar-root" className={`px-4 pb-24 ${isZen ? "text-stone-900" : "text-white"}`}>
       {/* Calendar Header */}
       <div className="pt-6 pb-4">
-        <h2 className="text-2xl font-black text-indigo-100 flex items-center gap-2">
+        <h2 className={`text-2xl font-black flex items-center gap-2 ${isZen ? "text-stone-950 font-black" : "text-indigo-100"}`}>
           꿈 달력
-          <span className="text-xs py-0.5 px-2.5 rounded-full bg-indigo-950 border border-indigo-800 text-indigo-400 font-mono">
+          <span className={`text-xs py-0.5 px-2.5 rounded-full font-mono font-bold border ${
+            isZen 
+              ? "bg-stone-200 border-stone-300 text-stone-700" 
+              : "bg-indigo-950 border-indigo-805 text-indigo-400"
+          }`}>
             CALENDAR
           </span>
         </h2>
-        <p className="text-xs text-indigo-300/50">매달 수면 속 감정 지도를 일기식으로 비추기</p>
+        <p className={`text-xs ${isZen ? "text-stone-500 font-medium" : "text-indigo-300/50"}`}>매달 수면 속 감정 지도를 일기식으로 비추기</p>
       </div>
 
       {/* Calendar Box */}
-      <div className="bg-indigo-950/20 border border-indigo-900/40 rounded-3xl p-5 mb-6">
+      <div className={`rounded-3xl p-5 mb-6 border ${
+        isZen 
+          ? "bg-[#FAF7F0] border-stone-250 shadow-sm"
+          : "bg-indigo-950/20 border-indigo-900/40"
+      }`}>
         
         {/* Month Selector */}
         <div className="flex justify-between items-center mb-6">
-          <button onClick={handlePrevMonth} className="p-2 border border-indigo-900 rounded-xl hover:bg-indigo-950 transition-all">
-            <ChevronLeft className="w-5 h-5 text-indigo-300" />
+          <button 
+            onClick={handlePrevMonth} 
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              isZen 
+                ? "border-stone-300 hover:bg-stone-205 text-stone-800 bg-white" 
+                : "border-indigo-900 hover:bg-indigo-950 text-indigo-300"
+            }`}
+          >
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-base font-black text-indigo-100 font-mono tracking-wider">
+          <span className={`text-base font-black font-mono tracking-wider ${isZen ? "text-stone-900" : "text-indigo-100"}`}>
             {currentYear}년 {months[currentMonth]}
           </span>
-          <button onClick={handleNextMonth} className="p-2 border border-indigo-900 rounded-xl hover:bg-indigo-950 transition-all">
-            <ChevronRight className="w-5 h-5 text-indigo-300" />
+          <button 
+            onClick={handleNextMonth} 
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              isZen 
+                ? "border-stone-300 hover:bg-stone-205 text-stone-800 bg-white" 
+                : "border-indigo-900 hover:bg-indigo-950 text-indigo-300"
+            }`}
+          >
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
 
         {/* Days of Week Label */}
-        <div className="grid grid-cols-7 gap-y-2 text-center text-xs font-bold text-indigo-300/40 mb-3 uppercase tracking-wider font-mono">
+        <div className={`grid grid-cols-7 gap-y-2 text-center text-xs font-bold mb-3 uppercase tracking-wider font-mono ${
+          isZen ? "text-stone-500 font-bold" : "text-indigo-300/40"
+        }`}>
           <span>일</span>
           <span>월</span>
           <span>화</span>
@@ -153,10 +177,16 @@ export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWith
                 onClick={() => setSelectedCalendarDate(cal.dateString)}
                 className={`h-11 rounded-1.5xl flex flex-col items-center justify-center relative cursor-pointer transition-all ${
                   isSelected
-                    ? "bg-indigo-600 font-extrabold scale-105 shadow-md shadow-indigo-950"
+                    ? isZen
+                      ? "bg-stone-900 text-[#FDFBF7] font-black scale-105 shadow-sm border border-stone-950"
+                      : "bg-indigo-600 font-extrabold scale-105 shadow-md shadow-indigo-950 text-white"
                     : hasDreams
-                      ? "bg-indigo-950/60 border border-indigo-800 text-indigo-100 font-bold"
-                      : "bg-[#0B0D1B]/50 hover:bg-slate-900/50 text-indigo-300/40"
+                      ? isZen
+                        ? "bg-white border-2 border-stone-800 text-stone-950 font-black shadow-xs"
+                        : "bg-indigo-950/60 border border-indigo-800 text-indigo-100 font-bold"
+                      : isZen
+                        ? "bg-stone-150/80 hover:bg-stone-200 text-stone-400"
+                        : "bg-[#0B0D1B]/50 hover:bg-slate-900/50 text-indigo-300/40"
                 }`}
               >
                 <span className="text-xs">{cal.day}</span>
@@ -169,7 +199,11 @@ export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWith
         </div>
 
         {/* Mood Indicators footer */}
-        <div className="flex justify-center space-x-4 border-t border-indigo-900/10 mt-6 pt-4 text-[10px] text-indigo-300/50 font-bold">
+        <div className={`flex justify-center space-x-4 border-t mt-6 pt-4 text-[10px] font-bold ${
+          isZen 
+            ? "border-stone-200 text-stone-500" 
+            : "border-indigo-900/10 text-indigo-300/50"
+        }`}>
           <span className="flex items-center gap-1">🙂 좋은 꿈</span>
           <span className="flex items-center gap-1">😐 일반 꿈</span>
           <span className="flex items-center gap-1">😨 악몽</span>
@@ -179,7 +213,9 @@ export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWith
 
       {/* Day summary list */}
       <div className="space-y-4">
-        <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+        <h3 className={`text-xs font-black uppercase tracking-widest flex items-center gap-1.5 mb-2 ${
+          isZen ? "text-stone-850" : "text-indigo-400"
+        }`}>
           <CalIcon className="w-3.5 h-3.5" />
           {selectedCalendarDate} 꿈 기록 모음
         </h3>
@@ -189,28 +225,49 @@ export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWith
             <div
               key={dr.id}
               onClick={() => onSelectDream(dr)}
-              className="bg-indigo-950/20 border border-indigo-900/40 rounded-2xl p-4 flex justify-between items-center hover:bg-indigo-950/30 cursor-pointer"
+              className={`border rounded-2xl p-4 flex justify-between items-center transition-all cursor-pointer ${
+                isZen 
+                  ? "bg-white border-stone-250 shadow-xs hover:bg-stone-50 text-stone-900" 
+                  : "bg-indigo-950/20 border-indigo-900/40 hover:bg-indigo-950/30 text-white"
+              }`}
             >
               <div>
-                <h4 className="text-sm font-bold text-white mb-1">{dr.title}</h4>
+                <h4 className={`text-sm font-bold mb-1 ${isZen ? "text-stone-900" : "text-white"}`}>{dr.title}</h4>
                 <div className="flex gap-1.5">
                   {dr.emotions.map((em, index) => (
-                    <span key={index} className="px-2 py-0.5 rounded bg-indigo-900/50 border border-indigo-800/40 text-[9px] text-indigo-300 font-black">
+                    <span 
+                      key={index} 
+                      className={`px-2 py-0.5 rounded text-[9px] font-black border ${
+                        isZen 
+                          ? "bg-stone-100 border-stone-250 text-stone-700 font-bold" 
+                          : "bg-indigo-900/50 border border-indigo-800/40 text-indigo-300 font-bold"
+                      }`}
+                    >
                       {em}
                     </span>
                   ))}
                 </div>
               </div>
-              <Eye className="w-4 h-4 text-indigo-400/50" />
+              <Eye className={`w-4 h-4 ${isZen ? "text-stone-400" : "text-indigo-400/50"}`} />
             </div>
           ))
         ) : (
-          <div className="bg-indigo-950/10 border border-indigo-900/10 rounded-2xl p-6 text-center">
-            <p className="text-xs text-indigo-300/40 mb-3">해당 선택한 날짜에 기록된 꿈이 존재하지 않습니다.</p>
+          <div className={`rounded-2xl p-6 text-center border ${
+            isZen 
+              ? "bg-stone-100 border-stone-200" 
+              : "bg-indigo-950/10 border-indigo-900/10"
+          }`}>
+            <p className={`text-xs mb-3 ${isZen ? "text-stone-500 font-semibold" : "text-indigo-300/40"}`}>
+              해당 선택한 날짜에 기록된 꿈이 존재하지 않습니다.
+            </p>
             {selectedCalendarDate && (
               <button
                 onClick={() => onAddNewDreamWithDate(selectedCalendarDate)}
-                className="py-2 px-4 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-[11px] font-bold text-indigo-200 border border-indigo-800 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                className={`py-2 px-4 rounded-xl text-[11px] font-black border transition-colors inline-flex items-center gap-1 cursor-pointer ${
+                  isZen
+                    ? "bg-stone-900 text-[#FDFBF7] hover:bg-stone-800 border-stone-950"
+                    : "bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border-indigo-800"
+                }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 이 날짜에 새 꿈 남기기

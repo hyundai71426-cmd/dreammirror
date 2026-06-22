@@ -295,7 +295,7 @@ export default function MyProfile({ totalDreams, unlocked, onResetMocks, onBackT
           <div className="space-y-2">
             <label className={`text-[10px] font-bold block uppercase tracking-wider font-mono flex items-center gap-1 ${theme.textSecondary}`}>
               <Cpu className="w-3 h-3 text-pink-400" />
-              gemini 500회 호출, gemma 1500회 호출 (Preferred Model)
+              매일 gemini 500회 호출, gemma 1500회 호출 (Preferred Model)
             </label>
 
             <div className={`grid grid-cols-2 gap-2 p-1 rounded-xl border ${theme.id === "zen" ? "bg-white border-stone-250" : "bg-[#080B1C] border-indigo-950"}`}>
