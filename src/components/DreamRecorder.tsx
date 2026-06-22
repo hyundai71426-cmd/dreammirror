@@ -4,10 +4,13 @@ import { Dream, DreamAnalysis } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { analyzeDream } from "../api";
 
+import { THEME_STYLES, ThemeStyle } from "../theme";
+
 interface DreamRecorderProps {
   onSave: (dream: Dream) => void;
   onCancel: () => void;
   existingDreamCount: number;
+  theme?: ThemeStyle;
 }
 
 // Emoticons for emotions
@@ -23,7 +26,7 @@ const EMOTIONS = [
   { id: "혼란", emoji: "🤪", label: "혼란", color: "bg-purple-950/40 border-purple-800 text-purple-200" }
 ];
 
-export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: DreamRecorderProps) {
+export default function DreamRecorder({ onSave, onCancel, existingDreamCount, theme }: DreamRecorderProps) {
   // Steps:
   // "ready" -> "recording" -> "text_editing" -> "emotion_select" -> "additional_info" -> "ai_analyzing"
   const [step, setStep] = useState<"ready" | "recording" | "text_editing" | "emotion_select" | "additional_info" | "ai_analyzing" | "completed">("ready");
@@ -300,29 +303,63 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
       {/* Step 2: Live simulation of voice recording */}
       {step === "recording" && (
         <div id="recording-active-screen" className="flex flex-col items-center px-4 pt-8">
-          <div className="w-full flex justify-between items-center mb-16">
+          <div className="w-full flex justify-between items-center mb-10">
             <div className="w-6 h-6" />
             <span className="text-xs tracking-widest uppercase text-red-400 font-mono animate-pulse flex items-center gap-1.5 font-bold">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
               녹음 중...
             </span>
             <div className="w-6 h-6" />
           </div>
 
-          <div className="text-center mb-16">
-            <h1 className="text-4xl font-bold tracking-widest font-mono mb-2">{formatTimer(seconds)}</h1>
-            <p className="text-xs text-indigo-300/60">목소리로 지난밤 꿈 속 세밀한 감정과 장면들을 들려주세요.</p>
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-black tracking-widest font-mono mb-2 text-white">{formatTimer(seconds)}</h1>
+            <p className="text-[12px] text-indigo-300/70 font-sans max-w-xs mx-auto">목소리로 지난밤 꿈 속 세밀한 감정과 장면들을 한 구절씩 들려주세요.</p>
           </div>
 
-          {/* Sound wave visualizer bars */}
-          <div className="flex justify-center items-end space-x-1.5 h-32 w-full max-w-[240px] mb-8">
-            {waveHeights.map((h, i) => (
-              <div
-                key={i}
-                style={{ height: `${h}px` }}
-                className="w-1.5 rounded-full bg-gradient-to-t from-indigo-500 to-indigo-300 transition-all duration-100"
-              />
-            ))}
+          <div className={`w-full max-w-sm rounded-2xl p-4.5 mb-6 border bg-black/40 ${
+            theme?.id === "zen" ? "border-stone-200 bg-stone-100" : "border-indigo-950/40"
+          }`}>
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-[9px] uppercase tracking-wider font-mono text-[#f472b6] font-black">
+                🌌 UX ROADMAP 2단계: 실시간 햅틱 터치 & 주파수 파형 연동
+              </span>
+              <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-505/20 px-1 py-0.2 rounded font-black">
+                ACTIVE
+              </span>
+            </div>
+
+            {/* Sound wave visualizer bars */}
+            <div className="flex justify-center items-end space-x-1 h-24 w-full max-w-[280px] mx-auto">
+              {waveHeights.map((h, i) => {
+                let barColor = "from-indigo-500 to-indigo-300";
+                if (theme?.id === "zen") {
+                  barColor = "from-stone-600 to-stone-400";
+                } else if (theme?.id === "neo-aura") {
+                  barColor = "from-[#f43f5e] to-fuchsia-400";
+                }
+                return (
+                  <div
+                    key={i}
+                    style={{ height: `${h * 0.8}px` }}
+                    className={`w-1 rounded-full bg-gradient-to-t ${barColor} transition-all duration-100 shadow-sm`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Interactive Sine wave breath line overlay */}
+            <div className="relative h-6 mt-4 flex items-center justify-center overflow-hidden w-full">
+              <svg className="w-full h-full opacity-60" viewBox="0 0 300 24">
+                <path
+                  d={`M 0 12 Q 37.5 ${12 + (Math.sin(seconds * 3) * 6)} 75 12 T 150 12 T 225 12 T 300 12`}
+                  fill="none"
+                  stroke={theme?.id === "neo-aura" ? "#ec4899" : theme?.id === "zen" ? "#1c1917" : "#6366f1"}
+                  strokeWidth="1.5"
+                  className="animate-pulse"
+                />
+              </svg>
+            </div>
           </div>
 
           {/* Real-time transcribed text display */}
@@ -342,61 +379,119 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount }: 
           <button
             id="btn-stop-recording"
             onClick={stopRecording}
-            className="w-20 h-20 rounded-full bg-red-600 shadow-xl border-4 border-red-400/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-white"
+            className="w-18 h-18 rounded-full bg-red-600 shadow-xl border-4 border-red-400/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-white cursor-pointer"
           >
-            <Square className="w-7 h-7 fill-white" />
+            <Square className="w-6 h-6 fill-white" />
           </button>
-          <span className="text-xs text-red-200/60 mt-3 font-semibold">녹음 정지</span>
+          <span className="text-xs text-red-200/60 mt-2 font-black tracking-tight">녹음 완료 및 분석 진행 &rarr;</span>
         </div>
       )}
 
       {/* Step 3: Text Conversion & Suggestions */}
       {step === "text_editing" && (
-        <div id="text-edit-screen" className="px-5 pt-6">
+        <div id="text-edit-screen" className={`px-5 pt-6 ${
+          theme?.id === "zen" ? "bg-[#FAF7F0] text-stone-800 rounded-3xl" : ""
+        }`}>
           <div className="flex items-center justify-between mb-6">
-            <button onClick={() => setStep("ready")} className="p-2 -ml-2 text-indigo-400">
+            <button 
+              onClick={() => setStep("ready")} 
+              className={`p-2 -ml-2 transition-colors ${
+                theme?.id === "zen" ? "text-stone-500 hover:text-stone-950" : "text-indigo-400"
+              }`}
+            >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <span className="text-xs font-semibold text-indigo-300">STEP 4 · 텍스트 변환 및 편집</span>
+            <span className={`text-xs font-bold font-mono uppercase tracking-wider ${
+              theme?.id === "zen" ? "text-stone-400" : "text-indigo-300"
+            }`}>
+              {theme?.id === "zen" ? "📖 JOURNALING FOCUS" : "STEP 4 · 텍스트 변환 및 편집"}
+            </span>
             <button
               onClick={handleNextFromText}
-              className="text-xs font-bold text-indigo-400 bg-indigo-950/80 px-3 py-1.5 rounded-lg border border-indigo-800 hover:bg-indigo-950"
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                theme?.id === "zen" 
+                  ? "text-stone-800 bg-stone-200/80 border-stone-300 hover:bg-stone-200" 
+                  : "text-indigo-400 bg-indigo-950/80 border-indigo-800 hover:bg-indigo-950"
+              }`}
             >
               다음
             </button>
           </div>
 
-          <div className="mb-5 bg-indigo-900/20 border border-indigo-950 rounded-2xl p-4">
-            <label className="text-[11px] uppercase tracking-wider text-indigo-400 font-bold block mb-2">제목 (AI 추천 또는 입력)</label>
+          {/* Title Area */}
+          <div className={`mb-5 rounded-2xl p-4 border transition-all ${
+            theme?.id === "zen" 
+              ? "bg-[#FDFBF7] border-stone-200 shadow-xs" 
+              : theme?.id === "neo-aura"
+                ? "bg-[#1F112D]/40 border-fuchsia-900/40"
+                : "bg-indigo-900/20 border border-indigo-950"
+          }`}>
+            <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
+              theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
+            }`}>
+              제목 (AI 추천 또는 입력)
+            </label>
             <input
               id="input-dream-title"
               type="text"
               value={dreamTitle}
               onChange={(e) => setDreamTitle(e.target.value)}
               placeholder="예: 어두운 숲속의 미로"
-              className="w-full bg-[#080B1B] text-sm text-white rounded-xl py-3 px-4 outline-none border border-indigo-900/60 focus:border-indigo-500 font-sans font-medium"
+              className={`w-full text-sm rounded-xl py-3 px-4 outline-none border transition-all ${
+                theme?.id === "zen"
+                  ? "bg-[#F5F2EA] text-stone-900 focus:border-stone-400 border-stone-200 font-serif font-black"
+                  : theme?.id === "neo-aura"
+                    ? "bg-black/40 text-white focus:border-pink-500 border-zinc-900"
+                    : "bg-[#080B1B] text-[#FFF] focus:border-indigo-500 border-indigo-900/60 font-medium"
+              }`}
             />
           </div>
 
-          <div className="bg-indigo-900/20 border border-indigo-950 rounded-2xl p-4">
-            <label className="text-[11px] uppercase tracking-wider text-indigo-400 font-bold block mb-2">꿈 기록 내용</label>
+          {/* Main Focused Textarea (책 표지 및 스마트 딤 모드 지원) */}
+          <div className={`rounded-2xl p-4 border transition-all ${
+            theme?.id === "zen" 
+              ? "bg-[#FDFBF7] border-stone-250 shadow-sm relative" 
+              : theme?.id === "neo-aura"
+                ? "bg-[#1F112D]/40 border-fuchsia-900/40"
+                : "bg-indigo-900/20 border border-indigo-950"
+          }`}>
+            <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
+              theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
+            }`}>
+              {theme?.id === "zen" ? "수면의 기록 (3~4줄로 극적인 시적 심상만 복원)" : "꿈 기록 내용"}
+            </label>
+            
             <textarea
               id="input-dream-content"
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               placeholder="이곳에 꿈속에서 일어난 세밀한 스토리라인을 직접 타이핑하여 기록해 보세요..."
-              rows={8}
-              className="w-full bg-[#080B1B] text-sm leading-relaxed text-indigo-100 rounded-xl py-3 px-4 border border-indigo-900/50 focus:border-indigo-500 outline-none resize-none font-sans"
+              rows={theme?.id === "zen" ? 5 : 8} // 스마트 딤 에디토리얼 글쓰기 모드: 5줄로 조율하여 촘촘히 포커스
+              className={`w-full text-sm leading-relaxed rounded-xl py-3 px-4 border outline-none resize-none transition-all ${
+                theme?.id === "zen"
+                  ? "bg-[#FAF7F0] text-stone-900 border-stone-150 focus:border-stone-400 font-serif tracking-wide leading-loose" // 에디토리얼 줄간격
+                  : theme?.id === "neo-aura"
+                    ? "bg-black/40 text-zinc-100 border-zinc-900 focus:border-pink-500 font-mono"
+                    : "bg-[#080B1B] text-indigo-100 border-indigo-900/50 focus:border-indigo-500"
+              }`}
             />
-            <p className="text-[10px] text-indigo-400/60 mt-1">💡 등장인물, 장소, 사소한 단서도 세세하게 기록하면 분석의 정밀도가 올라갑니다.</p>
-            <p className="text-[10px] text-indigo-300/40 mt-1 flex items-center gap-1">🔑 개인 Google AI Studio API 키 발급 가이드는 <strong className="text-indigo-400/60">"마이 프로필"</strong> 탭에서 편리하게 확인하실 수 있습니다.</p>
+            <p className={`text-[10px] mt-2.5 leading-relaxed font-medium ${theme?.id === "zen" ? "text-stone-405 font-serif" : "text-indigo-400/60"}`}>
+              {theme?.id === "zen" 
+                ? "📖 눈이 부시지 않게 주변 여백을 부드러운 양반지 톤으로 유지하는 스마트 딤 글쓰기 모드가 활성화되어 있습니다."
+                : "💡 등장인물, 장소, 사소한 단서도 세세하게 기록하면 분석의 정밀도가 올라갑니다."
+              }
+            </p>
           </div>
 
           <div className="mt-8">
             <button
               id="btn-text-next"
               onClick={handleNextFromText}
-              className="w-full py-4 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 transition-colors flex items-center justify-center space-x-2"
+              className={`w-full rounded-2xl font-black flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                theme?.id === "cosmic" 
+                  ? "py-4.5 text-base" // 미니멀아우라: 큼직한 높이
+                  : "py-4 text-sm"
+              } ${theme?.accentBtn || "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
             >
               <span>다음과정 감정 선택으로</span>
               <ArrowRight className="w-4 h-4" />

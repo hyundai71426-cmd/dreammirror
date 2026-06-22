@@ -2,13 +2,16 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, Eye, ShoppingCart } from "lucide-react";
 import { Dream } from "../types";
 
+import { THEME_STYLES, ThemeStyle } from "../theme";
+
 interface DreamCalendarProps {
   dreams: Dream[];
   onSelectDream: (dream: Dream) => void;
   onAddNewDreamWithDate: (dateStr: string) => void;
+  theme?: ThemeStyle;
 }
 
-export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWithDate }: DreamCalendarProps) {
+export default function DreamCalendar({ dreams, onSelectDream, onAddNewDreamWithDate, theme }: DreamCalendarProps) {
   // Simple calendar component initialized to June 2026 to align with the prompt's mocked dates
   const [currentYear, setCurrentYear] = useState(2026);
   const [currentMonth, setCurrentMonth] = useState(6); // 1-indexed, so 6 is June

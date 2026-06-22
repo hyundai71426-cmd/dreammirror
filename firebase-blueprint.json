@@ -1,0 +1,22 @@
+{
+  "collections": {
+    "posts": {
+      "schema": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "vividness": { "type": "number" },
+        "emotions": { "type": "array", "items": { "type": "string" } },
+        "reactions": {
+          "type": "map",
+          "properties": {
+            "like": { "type": "number" },
+            "wonder": { "type": "number" },
+            "support": { "type": "number" }
+          }
+        },
+        "timestamp": { "type": "timestamp" }
+      }
+    }
+  }
+}

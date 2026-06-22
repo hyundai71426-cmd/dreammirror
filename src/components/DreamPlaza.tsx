@@ -2,6 +2,19 @@ import { useState, useEffect } from "react";
 import { Users, Send, Sparkles, Heart, MessageSquare, ThumbsUp, HelpCircle } from "lucide-react";
 import { Dream } from "../types";
 import { motion, AnimatePresence } from "motion/react";
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  limit, 
+  doc, 
+  updateDoc, 
+  increment, 
+  serverTimestamp 
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 interface SharedPost {
   id: string;
@@ -47,81 +60,117 @@ const INITIAL_SHARED_POSTS: SharedPost[] = [
   }
 ];
 
+import { THEME_STYLES, ThemeStyle } from "../theme";
+
 interface DreamPlazaProps {
   userDreams: Dream[];
+  theme?: ThemeStyle;
 }
 
-export default function DreamPlaza({ userDreams }: DreamPlazaProps) {
+export default function DreamPlaza({ userDreams, theme }: DreamPlazaProps) {
   const [posts, setPosts] = useState<SharedPost[]>([]);
   const [selectedUserDreamId, setSelectedUserDreamId] = useState("");
   const [isSuccessShare, setIsSuccessShare] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("dream_mirror_plaza_v1");
-    if (saved) {
-      try {
-        setPosts(JSON.parse(saved));
-      } catch {
-        setPosts(INITIAL_SHARED_POSTS);
+    const postsRef = collection(db, "posts");
+    const q = query(postsRef, orderBy("timestamp", "desc"), limit(40));
+    
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) {
+        // Seed default template anonymous posts to the Firestore database if it is brand new and empty
+        let count = 0;
+        for (const post of INITIAL_SHARED_POSTS) {
+          try {
+            await addDoc(postsRef, {
+              title: post.title,
+              content: post.content,
+              createdAt: post.createdAt,
+              emotions: post.emotions,
+              vividness: post.vividness,
+              reactions: post.reactions,
+              // Offset default posts slightly to maintain correct sorting
+              timestamp: new Date(Date.now() - (3 - count) * 60000)
+            });
+            count++;
+          } catch (e) {
+            console.error("Seeding initial post error:", e);
+          }
+        }
+      } else {
+        const loadedPosts: SharedPost[] = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title || "",
+            content: data.content || "",
+            createdAt: data.createdAt || "방금 전",
+            emotions: data.emotions || [],
+            vividness: Number(data.vividness ?? 3),
+            reactions: {
+              like: Number(data.reactions?.like ?? 0),
+              wonder: Number(data.reactions?.wonder ?? 0),
+              support: Number(data.reactions?.support ?? 0)
+            }
+          };
+        });
+        setPosts(loadedPosts);
       }
-    } else {
+    }, (error) => {
+      console.error("Firestore loading error:", error);
+      // fallback if firestore config/rules have initial setup delay before syncing is ready
       setPosts(INITIAL_SHARED_POSTS);
-      localStorage.setItem("dream_mirror_plaza_v1", JSON.stringify(INITIAL_SHARED_POSTS));
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const savePostsToLocal = (updated: SharedPost[]) => {
-    setPosts(updated);
-    localStorage.setItem("dream_mirror_plaza_v1", JSON.stringify(updated));
-  };
-
-  const handleShareOnPlaza = () => {
+  const handleShareOnPlaza = async () => {
     if (!selectedUserDreamId) return;
 
     const targetDream = userDreams.find(d => d.id === selectedUserDreamId);
     if (!targetDream) return;
 
-    // Check duplicate share
-    const alreadyShared = posts.some(p => p.title === targetDream.title && p.content === targetDream.content);
+    // Check duplicate share locally
+    const alreadyShared = posts.some(p => p.title.replace(" 🔮", "") === targetDream.title && p.content === targetDream.content);
     if (alreadyShared) {
       alert("이미 광장에 공유된 꿈 기록입니다.");
       return;
     }
 
-    const newShare: SharedPost = {
-      id: `share-user-${Date.now()}`,
-      title: `${targetDream.title} 🔮`,
-      content: targetDream.content,
-      createdAt: "방금 전",
-      emotions: targetDream.emotions,
-      vividness: targetDream.vividness,
-      reactions: { like: 0, wonder: 1, support: 0 }
-    };
+    try {
+      const postsRef = collection(db, "posts");
+      await addDoc(postsRef, {
+        title: `${targetDream.title} 🔮`,
+        content: targetDream.content,
+        createdAt: "방금 전",
+        emotions: targetDream.emotions,
+        vividness: targetDream.vividness,
+        reactions: { like: 0, wonder: 1, support: 0 },
+        timestamp: serverTimestamp()
+      });
 
-    const updated = [newShare, ...posts];
-    savePostsToLocal(updated);
-    setIsSuccessShare(true);
-    setSelectedUserDreamId("");
+      setIsSuccessShare(true);
+      setSelectedUserDreamId("");
 
-    setTimeout(() => {
-      setIsSuccessShare(false);
-    }, 3000);
+      setTimeout(() => {
+        setIsSuccessShare(false);
+      }, 3000);
+    } catch (e) {
+      console.error("Error sharing on plaza:", e);
+      alert("꿈 공유등록에 실패했습니다. 다시 시도해주세요!");
+    }
   };
 
-  const handleInteract = (postId: string, type: "like" | "wonder" | "support") => {
-    const updated = posts.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          reactions: {
-            ...p.reactions,
-            [type]: p.reactions[type] + 1
-          }
-        };
-      }
-      return p;
-    });
-    savePostsToLocal(updated);
+  const handleInteract = async (postId: string, type: "like" | "wonder" | "support") => {
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        [`reactions.${type}`]: increment(1)
+      });
+    } catch (e) {
+      console.error("Error updating reactions:", e);
+    }
   };
 
   return (
@@ -226,32 +275,30 @@ export default function DreamPlaza({ userDreams }: DreamPlazaProps) {
             </div>
 
             {/* Reactions control block */}
-            <div className="mt-3.5 pt-3 border-t border-indigo-950/50 flex justify-between items-center text-[10px] font-mono">
-              <span className="text-[#5c608f] text-[9px] font-black uppercase">공감 신호 증폭</span>
-
+            <div className="mt-3.5 pt-3 border-t border-indigo-950/50 flex justify-end items-center text-[10px] font-mono">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleInteract(post.id, "like")}
-                  className="px-2 py-1 rounded-lg bg-indigo-950/40 border border-indigo-900/30 hover:border-indigo-500/50 text-[#858CE0] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-950/60 border border-indigo-800/40 hover:bg-indigo-900/50 hover:border-indigo-500 text-xs font-black text-[#858CE0] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🫂</span>
-                  <span>{post.reactions.like}</span>
+                  <span>공감</span>
+                  <span className="font-mono font-bold bg-indigo-900/40 px-1.5 py-0.5 rounded text-[11px]">{post.reactions.like}</span>
                 </button>
 
                 <button
                   onClick={() => handleInteract(post.id, "wonder")}
-                  className="px-2 py-1 rounded-lg bg-indigo-950/40 border border-indigo-900/30 hover:border-indigo-500/50 text-[#C19CF0] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-[#2A1E3C]/60 border border-[#4C286C]/40 hover:bg-[#341F4D]/50 hover:border-purple-500 text-xs font-black text-[#C19CF0] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🔮</span>
-                  <span>{post.reactions.wonder}</span>
+                  <span>위로</span>
+                  <span className="font-mono font-bold bg-[#341F4D]/40 px-1.5 py-0.5 rounded text-[11px]">{post.reactions.wonder}</span>
                 </button>
 
                 <button
                   onClick={() => handleInteract(post.id, "support")}
-                  className="px-2 py-1 rounded-lg bg-indigo-950/40 border border-indigo-900/30 hover:border-indigo-500/50 text-[#F5B5B5] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-[#2E1A1A]/60 border border-[#522929]/40 hover:bg-[#3C1A1A]/50 hover:border-rose-500 text-xs font-black text-[#F5B5B5] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🧸</span>
-                  <span>{post.reactions.support}</span>
+                  <span>감사</span>
+                  <span className="font-mono font-bold bg-[#3C1A1A]/50 px-1.5 py-0.5 rounded text-[11px]">{post.reactions.support}</span>
                 </button>
               </div>
             </div>
