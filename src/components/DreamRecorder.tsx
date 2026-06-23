@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, Square, Sparkles, Check, Flame, Star, BookOpen, AlertCircle, ArrowLeft, ArrowRight, Save, Clock } from "lucide-react";
 import { Dream, DreamAnalysis } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { analyzeDream } from "../api";
+import { analyzeDream, transcribeAudio } from "../api";
 
 import { THEME_STYLES, ThemeStyle } from "../theme";
 
@@ -31,6 +31,7 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount, th
   // "ready" -> "recording" -> "text_editing" -> "emotion_select" -> "additional_info" -> "ai_analyzing"
   const [step, setStep] = useState<"ready" | "recording" | "text_editing" | "emotion_select" | "additional_info" | "ai_analyzing" | "completed">("ready");
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   
   const [seconds, setSeconds] = useState(0);
   const [audioInputSimulated, setAudioInputSimulated] = useState(false);
@@ -51,12 +52,20 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount, th
   const timerRef = useRef<any>(null);
   const waveRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
+        } catch (_) {}
+      }
+      if (streamRef.current) {
+        try {
+          streamRef.current.getTracks().forEach(track => track.stop());
         } catch (_) {}
       }
     };
@@ -97,12 +106,58 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount, th
     };
   }, [step]);
 
-  // Handle Speech Recognition Simulation or microphone
-  const startRecording = () => {
+  const fallbackPreset = () => {
+    setTranscript("준비되지 않은 발표를 하러 많은 관중들이 있는 대강당 무대에 올라갔다. 피피티 슬라이드를 켜려는데 자꾸 마우스가 버벅대고 전원이 꺼지더니 노트북이 검게 굳어버렸다. 주위 회사 동료들과 무서운 상사의 가시 돋친 따가운 눈길들이 일제히 나에게 쏠리고 내 머리는 아득히 희고 멍해지며 너무나 불안하고 소스라치게 부끄러웠다.");
+    setDreamTitle("무대 위에서의 기계 고장");
+  };
+
+  // Handle Speech Recognition and active MediaRecorder recording for Gemini Audio STT
+  const startRecording = async () => {
     setSeconds(0);
     setTranscript("");
     setStep("recording");
+    setIsTranscribing(false);
+    audioChunksRef.current = [];
 
+    // 1. Initialize MediaRecorder for high-fidelity Gemini Audio transcription
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+
+        // Find best supported audio format
+        let mimeType = 'audio/webm';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              mimeType = 'audio/mp4';
+            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+              mimeType = 'audio/ogg';
+            } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+              mimeType = 'audio/wav';
+            } else {
+              mimeType = '';
+            }
+          }
+
+          const options = mimeType ? { mimeType } : undefined;
+          const mediaRecorder = new MediaRecorder(stream, options);
+          mediaRecorderRef.current = mediaRecorder;
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              audioChunksRef.current.push(event.data);
+            }
+          };
+
+          mediaRecorder.start(250);
+        }
+      } catch (err) {
+        console.error("Microphone device access denied or failed:", err);
+      }
+    }
+
+    // 2. Concurrently start live Web Speech preview for real-time visual subtitles (optional fallback)
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       try {
@@ -122,37 +177,113 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount, th
         };
 
         rec.onerror = (e: any) => {
-          console.error("Speech recognition error:", e);
+          console.error("Live Speech recognition preview error:", e);
         };
 
         rec.onend = () => {
-          console.log("Speech recognition ended");
+          console.log("Live Speech recognition preview ended");
         };
 
         rec.start();
         recognitionRef.current = rec;
       } catch (err) {
-        console.error("Failed to start speech recognition:", err);
+        console.error("Failed to start live speech recognition preview:", err);
       }
     }
   };
 
   const stopRecording = () => {
-    setStep("text_editing");
+    // 1. Terminate browser live-text predictor
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (err) {
-        console.error("Error stopping speech recognition:", err);
+        console.error("Error stopping live speech recognition preview:", err);
       }
     }
-    // Only if transcript is empty, fallback to the preset text so they still have something to see if they didn't speak
-    if (!transcript.trim()) {
-      setTranscript("준비되지 않은 발표를 하러 많은 관중들이 있는 대강당 무대에 올라갔다. 피피티 슬라이드를 켜려는데 자꾸 마우스가 버벅대고 전원이 꺼지더니 노트북이 검게 굳어버렸다. 주위 회사 동료들과 무서운 상사의 가시 돋친 따가운 눈길들이 일제히 나에게 쏠리고 내 머리는 아득히 희고 멍해지며 너무나 불안하고 소스라치게 부끄러웠다.");
-      setDreamTitle("무대 위에서의 기계 고장");
+
+    // 2. Terminate MediaRecorder and start server-side transcribe trigger
+    const mediaRecorder = mediaRecorderRef.current;
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      try {
+        setIsTranscribing(true);
+        setStep("text_editing");
+
+        mediaRecorder.onstop = async () => {
+          try {
+            // Free the microphone lock quickly
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach(track => track.stop());
+              streamRef.current = null;
+            }
+
+            const recordedMimeType = mediaRecorder.mimeType || "audio/webm";
+            const audioBlob = new Blob(audioChunksRef.current, { type: recordedMimeType });
+
+            if (audioBlob.size > 0) {
+              const reader = new FileReader();
+              reader.readAsDataURL(audioBlob);
+              reader.onloadend = async () => {
+                try {
+                  const base64Url = reader.result as string;
+                  const base64Data = base64Url.split(",")[1];
+
+                  // POST audio base64 to server endpoint transcribing via Gemini
+                  const transcribedText = await transcribeAudio(base64Data, recordedMimeType);
+                  
+                  if (transcribedText && transcribedText.trim()) {
+                    setTranscript(transcribedText);
+                    const cleanTitle = transcribedText.length > 20 ? transcribedText.substring(0, 18) + "..." : transcribedText;
+                    setDreamTitle(cleanTitle || "녹음된 꿈 이야기");
+                  } else if (!transcript.trim()) {
+                    fallbackPreset();
+                  }
+                } catch (txError: any) {
+                  console.error("Gemini Transcription failed, reverting to local backup:", txError);
+                  if (!transcript.trim()) {
+                    fallbackPreset();
+                  }
+                } finally {
+                  setIsTranscribing(false);
+                }
+              };
+            } else {
+              if (!transcript.trim()) {
+                fallbackPreset();
+              }
+              setIsTranscribing(false);
+            }
+          } catch (stopErr) {
+            console.error("Failed within mediaRecorder.onstop lifecycle:", stopErr);
+            if (!transcript.trim()) {
+              fallbackPreset();
+            }
+            setIsTranscribing(false);
+          }
+        };
+
+        mediaRecorder.stop();
+      } catch (err) {
+        console.error("Error stopping MediaRecorder:", err);
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        if (!transcript.trim()) {
+          fallbackPreset();
+        }
+        setIsTranscribing(false);
+        setStep("text_editing");
+      }
     } else {
-      const cleanTitle = transcript.length > 20 ? transcript.substring(0, 18) + "..." : transcript;
-      setDreamTitle(cleanTitle || "녹음된 꿈 이야기");
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (!transcript.trim()) {
+        fallbackPreset();
+      }
+      setStep("text_editing");
     }
   };
 
@@ -392,111 +523,140 @@ export default function DreamRecorder({ onSave, onCancel, existingDreamCount, th
         <div id="text-edit-screen" className={`px-5 pt-6 ${
           theme?.id === "zen" ? "bg-[#FAF7F0] text-stone-800 rounded-3xl" : ""
         }`}>
-          <div className="flex items-center justify-between mb-6">
-            <button 
-              onClick={() => setStep("ready")} 
-              className={`p-2 -ml-2 transition-colors ${
-                theme?.id === "zen" ? "text-stone-500 hover:text-stone-950" : "text-indigo-400"
-              }`}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <span className={`text-xs font-bold font-mono uppercase tracking-wider ${
-              theme?.id === "zen" ? "text-stone-400" : "text-indigo-300"
-            }`}>
-              {theme?.id === "zen" ? "📖 JOURNALING FOCUS" : "STEP 4 · 텍스트 변환 및 편집"}
-            </span>
-            <button
-              onClick={handleNextFromText}
-              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+          {isTranscribing ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="relative mb-6">
+                <div className={`w-16 h-16 rounded-full border-4 border-t-transparent animate-spin ${
+                  theme?.id === "zen" 
+                    ? "border-stone-800" 
+                    : theme?.id === "neo-aura" 
+                      ? "border-[#f43f5e]" 
+                      : "border-indigo-500"
+                }`} />
+                <Mic className={`w-6 h-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse ${
+                  theme?.id === "zen" ? "text-stone-700" : theme?.id === "neo-aura" ? "text-[#f43f5e]" : "text-indigo-400"
+                }`} />
+              </div>
+              <h3 className={`text-lg font-bold mb-2 ${
+                theme?.id === "zen" ? "text-stone-800 font-serif" : "text-indigo-200"
+              }`}>
+                녹음된 음성 변환 중...
+              </h3>
+              <p className={`text-xs max-w-xs leading-relaxed mx-auto ${
+                theme?.id === "zen" ? "text-stone-550 font-serif font-medium" : "text-indigo-300/60 font-medium"
+              }`}>
+                Gemini AI가 어젯밤 속삭인 당신의 꿈 목소리를 선명한 텍스트 문장으로 풀어내고 있습니다. 잠시만 기다려 주세요. ✨
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-6">
+                <button 
+                  onClick={() => setStep("ready")} 
+                  className={`p-2 -ml-2 transition-colors ${
+                    theme?.id === "zen" ? "text-stone-500 hover:text-stone-950" : "text-indigo-400"
+                  }`}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <span className={`text-xs font-bold font-mono uppercase tracking-wider ${
+                  theme?.id === "zen" ? "text-stone-400" : "text-indigo-300"
+                }`}>
+                  {theme?.id === "zen" ? "📖 JOURNALING FOCUS" : "STEP 4 · 텍스트 변환 및 편집"}
+                </span>
+                <button
+                  onClick={handleNextFromText}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                    theme?.id === "zen" 
+                      ? "text-stone-800 bg-stone-200/80 border-stone-300 hover:bg-stone-200" 
+                      : "text-indigo-400 bg-indigo-950/80 border-indigo-800 hover:bg-indigo-950"
+                  }`}
+                >
+                  다음
+                </button>
+              </div>
+
+              {/* Title Area */}
+              <div className={`mb-5 rounded-2xl p-4 border transition-all ${
                 theme?.id === "zen" 
-                  ? "text-stone-800 bg-stone-200/80 border-stone-300 hover:bg-stone-200" 
-                  : "text-indigo-400 bg-indigo-950/80 border-indigo-800 hover:bg-indigo-950"
-              }`}
-            >
-              다음
-            </button>
-          </div>
-
-          {/* Title Area */}
-          <div className={`mb-5 rounded-2xl p-4 border transition-all ${
-            theme?.id === "zen" 
-              ? "bg-[#FDFBF7] border-stone-200 shadow-xs" 
-              : theme?.id === "neo-aura"
-                ? "bg-[#1F112D]/40 border-fuchsia-900/40"
-                : "bg-indigo-900/20 border border-indigo-950"
-          }`}>
-            <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
-              theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
-            }`}>
-              제목 (AI 추천 또는 입력)
-            </label>
-            <input
-              id="input-dream-title"
-              type="text"
-              value={dreamTitle}
-              onChange={(e) => setDreamTitle(e.target.value)}
-              placeholder="예: 어두운 숲속의 미로"
-              className={`w-full text-sm rounded-xl py-3 px-4 outline-none border transition-all ${
-                theme?.id === "zen"
-                  ? "bg-[#F5F2EA] text-stone-900 focus:border-stone-400 border-stone-200 font-serif font-black"
+                  ? "bg-[#FDFBF7] border-stone-200 shadow-xs" 
                   : theme?.id === "neo-aura"
-                    ? "bg-black/40 text-white focus:border-pink-500 border-zinc-900"
-                    : "bg-[#080B1B] text-[#FFF] focus:border-indigo-500 border-indigo-900/60 font-medium"
-              }`}
-            />
-          </div>
+                    ? "bg-[#1F112D]/40 border-fuchsia-900/40"
+                    : "bg-indigo-900/20 border border-indigo-950"
+              }`}>
+                <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
+                  theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
+                }`}>
+                  제목 (AI 추천 또는 입력)
+                </label>
+                <input
+                  id="input-dream-title"
+                  type="text"
+                  value={dreamTitle}
+                  onChange={(e) => setDreamTitle(e.target.value)}
+                  placeholder="예: 어두운 숲속의 미로"
+                  className={`w-full text-sm rounded-xl py-3 px-4 outline-none border transition-all ${
+                    theme?.id === "zen"
+                      ? "bg-[#F5F2EA] text-stone-900 focus:border-stone-400 border-stone-200 font-serif font-black"
+                      : theme?.id === "neo-aura"
+                        ? "bg-black/40 text-white focus:border-pink-500 border-zinc-900"
+                        : "bg-[#080B1B] text-[#FFF] focus:border-indigo-500 border-indigo-900/60 font-medium"
+                  }`}
+                />
+              </div>
 
-          {/* Main Focused Textarea (책 표지 및 스마트 딤 모드 지원) */}
-          <div className={`rounded-2xl p-4 border transition-all ${
-            theme?.id === "zen" 
-              ? "bg-[#FDFBF7] border-stone-250 shadow-sm relative" 
-              : theme?.id === "neo-aura"
-                ? "bg-[#1F112D]/40 border-fuchsia-900/40"
-                : "bg-indigo-900/20 border border-indigo-950"
-          }`}>
-            <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
-              theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
-            }`}>
-              {theme?.id === "zen" ? "수면의 기록 (3~4줄로 극적인 시적 심상만 복원)" : "꿈 기록 내용"}
-            </label>
-            
-            <textarea
-              id="input-dream-content"
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              placeholder="이곳에 꿈속에서 일어난 세밀한 스토리라인을 직접 타이핑하여 기록해 보세요..."
-              rows={theme?.id === "zen" ? 5 : 8} // 스마트 딤 에디토리얼 글쓰기 모드: 5줄로 조율하여 촘촘히 포커스
-              className={`w-full text-sm leading-relaxed rounded-xl py-3 px-4 border outline-none resize-none transition-all ${
-                theme?.id === "zen"
-                  ? "bg-[#FAF7F0] text-stone-900 border-stone-150 focus:border-stone-400 font-serif tracking-wide leading-loose" // 에디토리얼 줄간격
+              {/* Main Focused Textarea (책 표지 및 스마트 딤 모드 지원) */}
+              <div className={`rounded-2xl p-4 border transition-all ${
+                theme?.id === "zen" 
+                  ? "bg-[#FDFBF7] border-stone-250 shadow-sm relative" 
                   : theme?.id === "neo-aura"
-                    ? "bg-black/40 text-zinc-100 border-zinc-900 focus:border-pink-500 font-mono"
-                    : "bg-[#080B1B] text-indigo-100 border-indigo-900/50 focus:border-indigo-500"
-              }`}
-            />
-            <p className={`text-[10px] mt-2.5 leading-relaxed font-medium ${theme?.id === "zen" ? "text-stone-405 font-serif" : "text-indigo-400/60"}`}>
-              {theme?.id === "zen" 
-                ? "📖 눈이 부시지 않게 주변 여백을 부드러운 양반지 톤으로 유지하는 스마트 딤 글쓰기 모드가 활성화되어 있습니다."
-                : "💡 등장인물, 장소, 사소한 단서도 세세하게 기록하면 분석의 정밀도가 올라갑니다."
-              }
-            </p>
-          </div>
+                    ? "bg-[#1F112D]/40 border-fuchsia-900/40"
+                    : "bg-indigo-900/20 border border-indigo-950"
+              }`}>
+                <label className={`text-[11px] uppercase tracking-wider font-extrabold block mb-2 ${
+                  theme?.id === "zen" ? "text-stone-500 font-serif" : "text-indigo-400"
+                }`}>
+                  {theme?.id === "zen" ? "수면의 기록 (3~4줄로 극적인 시적 심상만 복원)" : "꿈 기록 내용"}
+                </label>
+                
+                <textarea
+                  id="input-dream-content"
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="이곳에 꿈속에서 일어난 세밀한 스토리라인을 직접 타이핑하여 기록해 보세요..."
+                  rows={theme?.id === "zen" ? 5 : 8} // 스마트 딤 에디토리얼 글쓰기 모드: 5줄로 조율하여 촘촘히 포커스
+                  className={`w-full text-sm leading-relaxed rounded-xl py-3 px-4 border outline-none resize-none transition-all ${
+                    theme?.id === "zen"
+                      ? "bg-[#FAF7F0] text-stone-900 border-stone-150 focus:border-stone-400 font-serif tracking-wide leading-loose" // 에디토리얼 줄간격
+                      : theme?.id === "neo-aura"
+                        ? "bg-black/40 text-zinc-100 border-zinc-900 focus:border-pink-500 font-mono"
+                        : "bg-[#080B1B] text-indigo-100 border-indigo-900/50 focus:border-indigo-500"
+                  }`}
+                />
+                <p className={`text-[10px] mt-2.5 leading-relaxed font-medium ${theme?.id === "zen" ? "text-stone-405 font-serif" : "text-indigo-400/60"}`}>
+                  {theme?.id === "zen" 
+                    ? "📖 눈이 부시지 않게 주변 여백을 부드러운 양반지 톤으로 유지하는 스마트 딤 글쓰기 모드가 활성화되어 있습니다."
+                    : "💡 등장인물, 장소, 사소한 단서도 세세하게 기록하면 분석의 정밀도가 올라갑니다."
+                  }
+                </p>
+              </div>
 
-          <div className="mt-8">
-            <button
-              id="btn-text-next"
-              onClick={handleNextFromText}
-              className={`w-full rounded-2xl font-black flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                theme?.id === "cosmic" 
-                  ? "py-4.5 text-base" // 미니멀아우라: 큼직한 높이
-                  : "py-4 text-sm"
-              } ${theme?.accentBtn || "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
-            >
-              <span>다음과정 감정 선택으로</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+              <div className="mt-8">
+                <button
+                  id="btn-text-next"
+                  onClick={handleNextFromText}
+                  className={`w-full rounded-2xl font-black flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                    theme?.id === "cosmic" 
+                      ? "py-4.5 text-base" // 미니멀아우라: 큼직한 높이
+                      : "py-4 text-sm"
+                  } ${theme?.accentBtn || "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
+                >
+                  <span>다음과정 감정 선택으로</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

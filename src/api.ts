@@ -294,3 +294,47 @@ export async function chatCharacter(
     return { response: responseText.trim() };
   });
 }
+
+// 6. Transcribe Audio (Uses server-side Gemini audio-to-text API)
+export async function transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
+  const customApiKey = localStorage.getItem("gemini_api_key") || "";
+  const preferredModel = localStorage.getItem("gemini_preferred_model") || "gemini-2.0-flash";
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+
+  if (customApiKey) {
+    headers["x-gemini-api-key"] = customApiKey;
+  }
+  if (preferredModel) {
+    headers["x-gemini-model"] = preferredModel;
+  }
+
+  const response = await fetch("/api/transcribe", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      audio: base64Audio,
+      mimeType: mimeType
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let errorDetail = "음성 변환 실패";
+    try {
+      const parsedErr = JSON.parse(errText);
+      if (parsedErr.error) {
+        errorDetail = parsedErr.error;
+      }
+    } catch {
+      errorDetail = errText;
+    }
+    throw new Error(`음성 변환 중 오류 발생: ${errorDetail}`);
+  }
+
+  const result = await response.json();
+  return result.text || "";
+}
+

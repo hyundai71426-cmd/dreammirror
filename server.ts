@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
 // Initialize Gemini SDK lazily if key is available
 function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
@@ -196,6 +196,50 @@ app.post("/api/analyze-dream", async (req, res) => {
     // Graceful fallback to guarantee smooth execution
     const localResult = performLocalExtraction(req.body.content || "", req.body.emotions || []);
     return res.json(localResult);
+  }
+});
+
+// 1.5. Audio Transcription API (Uses Gemini server-side to transcribe recorded voice)
+app.post("/api/transcribe", async (req, res) => {
+  try {
+    const { audio, mimeType } = req.body;
+    if (!audio) {
+      return res.status(400).json({ error: "audio (base64 string) is required" });
+    }
+
+    const customApiKey = req.headers["x-gemini-api-key"] as string | undefined;
+    const customModel = req.headers["x-gemini-model"] as string | undefined;
+
+    const gemini = getGeminiClient(customApiKey);
+    if (!gemini) {
+      return res.status(400).json({ error: "Gemini API key is not configured in the workspace settings." });
+    }
+
+    // gemini-2.5-flash is our default model as recommended in guidelines - fast, inexpensive, supports multimodal audio
+    const modelToUse = customModel || "gemini-2.5-flash";
+
+    console.log(`Transcribing audio of mimetype: ${mimeType || "audio/webm"} using ${modelToUse}...`);
+
+    const response = await gemini.models.generateContent({
+      model: modelToUse,
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType || "audio/webm",
+            data: audio
+          }
+        },
+        "Please transcribe this recorded audio into clean, high-quality Korean text. The user is recording their voice describing a dream they had. Return ONLY the direct transcription text. Do NOT add any surrounding quotes, introductory remarks (like 'Here is the transcript:'), explanations, bullet points, or polite endings. Only output the Korean text representing exactly what is said. If the audio has only noise, hum, or silence with absolutely no words, return an empty string."
+      ]
+    });
+
+    const transcription = response.text?.trim() || "";
+    console.log("Transcription result:", transcription);
+    return res.json({ text: transcription });
+
+  } catch (error: any) {
+    console.error("Gemini audio transcription error:", error);
+    return res.status(500).json({ error: error.message || "Failed to transcribe audio using Gemini API" });
   }
 });
 
